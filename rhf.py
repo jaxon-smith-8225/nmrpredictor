@@ -8,9 +8,9 @@ Pipeline
 1.  nuclear_repulsion   — constant V_nn for fixed geometry
 2.  orthogonalizer      — X = S^(-1/2)  via eigendecomposition
 3.  initial_guess       — diagonalise H_core in orthogonal basis
-4.  make_density        — P_(mu)(nu) = 2 Sum(C_(mu)i C_(nu)i)  (occupied MOs only)
-5.  build_fock          — F = H_core + J - 1/2K  (full 4-index ERI)
-6.  compute_energy      — E = 1/2 Tr[P(H+F)] + V_nn
+4.  make_density        — P_μν = 2 Σᵢ C_μi C_νi  (occupied MOs only)
+5.  build_fock          — F = H_core + J - ½K  (full 4-index ERI)
+6.  compute_energy      — E = ½ Tr[P(H+F)] + V_nn
 7.  DIIS                — Pulay extrapolation for fast SCF convergence
 8.  scf_loop_diis       — main SCF driver
 """
@@ -24,7 +24,7 @@ def nuclear_repulsion(mol) -> float:
     """
     Nuclear repulsion energy (constant for a fixed geometry).
 
-    V_nn = Sum_{i<j} Z_i Z_j / r_ij   (atomic units, distances in Bohr)
+    V_nn = Σ_{i<j} Z_i Z_j / r_ij   (atomic units, distances in Bohr)
     """
     Vnn     = 0.0
     coords  = mol.atom_coords()    # Bohr
@@ -40,7 +40,7 @@ def orthogonalizer(S: np.ndarray) -> np.ndarray:
     """
     Compute the orthogonalising transformation X = S^(-1/2).
 
-    Uses eigendecomposition: S = U s U*  →  X = U s^(-1/2) U*
+    Uses eigendecomposition: S = U s U†  →  X = U s^(-1/2) U†
 
     Raises
     ------
@@ -77,7 +77,7 @@ def make_density(C: np.ndarray, n_occ: int) -> np.ndarray:
     """
     Build the closed-shell density matrix.
 
-    P_(mu))(nu) = 2 (sigma)ᵢ^{n_occ} C_(mu))i C_(nu)i
+    P_μν = 2 Σᵢ^{n_occ} C_μi C_νi
     """
     C_occ = C[:, :n_occ]
     return 2.0 * C_occ @ C_occ.T
@@ -89,11 +89,11 @@ def build_fock(H_core: np.ndarray, P: np.ndarray, ERI: np.ndarray) -> np.ndarray
     """
     Build the Fock matrix.
 
-    F_(mu)(nu) = H_(mu))(nu)  +  (sigma)_(lambda)(sigma) P_(lambda)(sigma) [((mu))(nu)|(lambda)(sigma)) - 1/2((mu))(lambda)|(nu)(sigma))]
+    F_μν = H_μν  +  Σ_λσ P_λσ [(μν|λσ) − ½(μλ|νσ)]
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
                        Coulomb J        Exchange K
 
-    ERI has shape ((mu)), (nu), (lambda), (sigma)) with PySCF's ((mu))(nu)|(lambda)(sigma)) ordering.
+    ERI has shape (μ, ν, λ, σ) with PySCF's (μν|λσ) ordering.
     """
     J = np.einsum('ls,mnls->mn', P, ERI)   # Coulomb
     K = np.einsum('ls,mlns->mn', P, ERI)   # Exchange
@@ -105,9 +105,9 @@ def compute_energy(P: np.ndarray, H_core: np.ndarray,
     """
     Total RHF energy.
 
-    E = 1/2 Tr[P(H_core + F)] + V_nn
+    E = ½ Tr[P(H_core + F)] + V_nn
 
-    The 1/2 avoids double-counting electron-electron repulsion,
+    The ½ avoids double-counting electron–electron repulsion,
     since it appears once in each electron's Fock operator.
     """
     E_elec = 0.5 * np.einsum('mn,mn->', P, H_core + F)
@@ -121,7 +121,7 @@ class DIIS:
     Pulay DIIS accelerator for SCF convergence.
 
     Stores the last `max_vecs` Fock matrices and their commutator error
-    vectors e = FPS - SPF, then extrapolates an improved Fock matrix
+    vectors e = FPS − SPF, then extrapolates an improved Fock matrix
     each cycle by solving a small least-squares problem.
     """
 
@@ -132,7 +132,7 @@ class DIIS:
 
     def update(self, F: np.ndarray, P: np.ndarray, S: np.ndarray) -> np.ndarray:
         """
-        Compute error e = FPS - SPF, store (F, e), return extrapolated F.
+        Compute error e = FPS − SPF, store (F, e), return extrapolated F.
         Falls back to the plain F if the B matrix is singular.
         """
         e = F @ P @ S - S @ P @ F
@@ -250,16 +250,4 @@ def run_rhf(mol):
     return scf_loop_diis(H_core, S, ERI, X, Vnn, n_occ)
 
 
-if __name__ == "__main__":
-    from molecule import build_acetone
-    mol    = build_acetone()
-    result = run_rhf(mol)
-    if result:
-        E, C, epsilon, P = result
-        S = mol.intor('int1e_ovlp')
-        n_occ = mol.nelectron // 2
-        print(f"\nTr(PS) = {np.trace(P @ S):.8f}  (should be {mol.nelectron})")
-        print("\nOrbital energies (Hartree):")
-        for i, e in enumerate(epsilon):
-            occ = "occ" if i < n_occ else "vir"
-            print(f"  MO {i+1:2d} ({occ}): {e:10.5f}")
+

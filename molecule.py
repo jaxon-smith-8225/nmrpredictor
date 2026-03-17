@@ -8,9 +8,6 @@ Swap out `mol.atom` and `mol.basis` here to change molecules or basis sets.
 """
 
 from pyscf import gto
-import numpy as np
-
-
 def build_acetone(basis: str = "sto-3g", verbose: int = 0) -> gto.Mole:
     """
     Build and return a PySCF Mole object for acetone.
@@ -52,6 +49,3 @@ def print_mol_info(mol: gto.Mole) -> None:
     print(f"ERI tensor size: {mol.nao**4 * 8 / 1e6:.1f} MB")
 
 
-if __name__ == "__main__":
-    mol = build_acetone()
-    print_mol_info(mol)

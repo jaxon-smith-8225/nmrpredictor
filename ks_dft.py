@@ -140,10 +140,22 @@ def vwn_correlation(rho: np.ndarray):
     # Potential: v_c = ε_c + (rho) · dε_c/d(rho)
     # Chain rule: d/d(rho) = (drs/d(rho))(d/drs),  drs/d(rho) = -rs/(3(rho))
     #             d/drs = (1/2x) d/dx
+    #
+    # Full dε_c/dx has four contributions:
+    #   (1) d/dx [ln(x²/X)]             =  2/x - (2x+b)/X
+    #   (2) d/dx [(2b/Q)·arctan(...)]   = -b/X
+    #         using d/dx[arctan(Q/(2x+b))] = -Q/(2X)  and  (2b/Q)·(-Q/(2X)) = -b/X
+    #   (3) d/dx [-(bx0/X0)·ln((x-x0)²/X)] = -(bx0/X0)·[2/(x-x0) - (2x+b)/X]
+    #   (4) d/dx [-(bx0/X0)·(2(2x0+b)/Q)·arctan(...)]
+    #         = -(bx0/X0)·(2(2x0+b)/Q)·(-Q/(2X)) = +(bx0/X0)·(2x0+b)/X
+    #
+    # The original code omitted terms (2) and (4).
     dX_dx   = 2 * x + b
     deps_dx = A * (
-        2 / x - dX_dx / X
-        - (b * x0 / X0) * (2 / (x - x0) - dX_dx / X)
+        2 / x - dX_dx / X                                   # term (1)
+        - b / X                                              # term (2)  ← was missing
+        - (b * x0 / X0) * (2 / (x - x0) - dX_dx / X)      # term (3)
+        + (b * x0 / X0) * (2 * x0 + b) / X                 # term (4)  ← was missing
     )
     v_c = eps_c - (rs / 3.0) * deps_dx * (1.0 / (2.0 * x))
 
